@@ -1,0 +1,38 @@
+name: unpack-images
+on:
+  push:
+    paths:
+      - "_import/*.tar.gz.b64"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack image archives into r/<slug>/
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(_import/*.tar.gz.b64)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no archives to unpack"
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            slug=$(basename "$f" .tar.gz.b64)
+            mkdir -p "r/$slug"
+            base64 -d "$f" | tar -xz -C "r/$slug"
+            rm -f "$f"
+            echo "unpacked $slug"
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "no changes"
+            exit 0
+          fi
+          git commit -m "Unpack image assets for GitHub Pages"
+          git push
